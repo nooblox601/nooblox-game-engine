@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Mini 3D Game Engine - Three.js</title>
+<style>
+body {
+    margin: 0;
+    font-family: sans-serif;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+    background: #111;
+    color: white;
+}
+
+#sidebar {
+    width: 300px;
+    background: #222;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+}
+
+#canvasContainer {
+    flex: 1;
+    position: relative;
+}
+
+#objectList, #scriptList {
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.object, .script {
+    background: #333;
+    margin: 3px 0;
+    padding: 5px;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.object:hover, .script:hover {
+    background: #555;
+}
+
+#scriptEditor {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    margin-top: 5px;
+}
+
+#scriptEditor textarea {
+    flex: 1;
+    width: 100%;
+    background: #222;
+    color: #fff;
+    border: none;
+    padding: 5px;
+    font-family: monospace;
+    font-size: 14px;
+    resize: none;
+}
+
+#scriptEditor button {
+    margin-top: 5px;
+    padding: 5px;
+    background: #444;
+    border: none;
+    color: white;
+    cursor: pointer;
+    border-radius: 3px;
+}
+
+#scriptEditor button:hover {
+    background: #666;
+}
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+    <h2>Objetos 3D</h2>
+    <div id="objectList"></div>
+
+    <h2>Scripts</h2>
+    <div id="scriptList"></div>
+
+    <div id="scriptEditor">
+        <textarea id="scriptCode">// Ex: obj.rotation.y += 0.01;</textarea>
+        <button onclick="applyScript()">Aplicar Script</button>
+    </div>
+</div>
+
+<div id="canvasContainer"></div>
+
+<!-- Three.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+
+<script>
+/* === Scene, Camera, Renderer === */
+const container = document.getElementById('canvasContainer');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x222222);
+
+const camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+camera.position.z = 5;
+
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(container.clientWidth, container.clientHeight);
+container.appendChild(renderer.domElement);
+
+/* === Objetos 3D === */
+class GameObject3D {
+    constructor(name, mesh){
+        this.name = name;
+        this.mesh = mesh;
+        this.scripts = [];
+    }
+
+    update(){
+        this.scripts.forEach(fn => fn(this));
+    }
+}
+
+const objects3D = [];
+
+// Exemplo: cubos
+const geometry = new THREE.BoxGeometry();
+const material = new THREE.MeshStandardMaterial({color: 0xff0000});
+const cube = new THREE.Mesh(geometry, material);
+scene.add(cube);
+objects3D.push(new GameObject3D("Cube", cube));
+
+const geometry2 = new THREE.BoxGeometry();
+const material2 = new THREE.MeshStandardMaterial({color: 0x00ff00});
+const cube2 = new THREE.Mesh(geometry2, material2);
+cube2.position.x = 2;
+scene.add(cube2);
+objects3D.push(new GameObject3D("Cube2", cube2));
+
+/* Luz */
+const light = new THREE.DirectionalLight(0xffffff, 1);
+light.position.set(5,5,5);
+scene.add(light);
+
+const ambient = new THREE.AmbientLight(0x404040);
+scene.add(ambient);
+
+/* === Hierarquia e Scripts === */
+const objectList = document.getElementById('objectList');
+const scriptList = document.getElementById('scriptList');
+let selectedObject = null;
+let selectedScript = null;
+
+function refreshHierarchy(){
+    objectList.innerHTML = '';
+    objects3D.forEach(obj => {
+        const div = document.createElement('div');
+        div.className = 'object';
+        div.textContent = obj.name;
+        div.onclick = () => {
+            selectedObject = obj;
+            refreshScripts();
+        };
+        objectList.appendChild(div);
+    });
+}
+
+function refreshScripts(){
+    scriptList.innerHTML = '';
+    if(selectedObject){
+        selectedObject.scripts.forEach((s,i)=>{
+            const div = document.createElement('div');
+            div.className = 'script';
+            div.textContent = 'Script ' + (i+1);
+            div.onclick = () => {
+                document.getElementById('scriptCode').value = s.toString();
+                selectedScript = i;
+            };
+            scriptList.appendChild(div);
+        });
+    }
+}
+
+function applyScript(){
+    if(selectedObject){
+        try {
+            const fn = new Function('obj', document.getElementById('scriptCode').value);
+            if(selectedScript != null){
+                selectedObject.scripts[selectedScript] = fn;
+            } else {
+                selectedObject.scripts.push(fn);
+            }
+            selectedScript = null;
+            document.getElementById('scriptCode').value = '';
+            refreshScripts();
+        } catch(e){
+            alert("Erro no script: "+e);
+        }
+    } else {
+        alert("Selecione um objeto primeiro");
+    }
+}
+
+/* === Loop principal === */
+function animate(){
+    requestAnimationFrame(animate);
+    objects3D.forEach(obj => obj.update());
+    renderer.render(scene, camera);
+}
+
+/* Inicializa */
+refreshHierarchy();
+animate();
+
+/* Resize */
+window.addEventListener('resize', ()=>{
+    camera.aspect = container.clientWidth / container.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(container.clientWidth, container.clientHeight);
+});
+</script>
+</body>
+</html>
